@@ -21,7 +21,9 @@ process.on('uncaughtException', (err) => console.error('⚠️ [CRASH PREVENTED]
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const SERVER_ID = '1544326192868622458';
-const SUPPORTER_ROLE_ID = process.env.SUPPORTER_ROLE_ID;const SERVER_KEY = process.env.SERVER_KEY || '5839ecdfd43bc7467f77cba4a40ea64c8ee5f986f61cf16a0e024ed2225891a4'; 
+const ADMIN_ROLE_ID = '1545078453651505225'; // Admin role
+const EXTRA_ROLE_ID = '1545557033376546857'; // Additional role
+const SERVER_KEY = process.env.SERVER_KEY || '5839ecdfd43bc7467f77cba4a40ea64c8ee5f986f61cf16a0e024ed2225891a4'; 
 const REFRESH_API_URL = 'https://animalcompany.us-east1.nakamacloud.io/v2/account/session/refresh';
 
 // Primary Master Refresh Token
