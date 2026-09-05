@@ -19,7 +19,7 @@ process.on('uncaughtException', (err) => console.error('⚠️ [CRASH PREVENTED]
 
 // ==================== CONFIGURATION ====================
 const TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID || '1540776513119719591';
+const CLIENT_ID = process.env.CLIENT_ID || '1545848546517975092';
 const SERVER_KEY = process.env.SERVER_KEY || '5839ecdfd43bc7467f77cba4a40ea64c8ee5f986f61cf16a0e024ed2225891a4'; 
 const REFRESH_API_URL = 'https://nulls.tools/api/refresh';
 
