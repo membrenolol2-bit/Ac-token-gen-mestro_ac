@@ -255,11 +255,29 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     // Check if user has admin role
-    if (!interaction.member.roles.cache.has(ADMIN_ROLE_ID)) {
+    // Button handler: claim_token
+if (interaction.isButton() && interaction.customId === 'claim_token') {
+    // Ensure member exists in guild
+    if (!interaction.inGuild() || !interaction.member) {
         return interaction.reply({
-            content: '❌ You need the Admin role to use this command.',
+            content: '❌ This can only be used in the server.',
             ephemeral: true
         });
+    }
+
+    const userId = interaction.user.id;
+    const now = Date.now();
+
+    // Start with the normal 10-minute cooldown
+    let cooldownSeconds = botSettings.defaultCooldownSeconds;
+
+    // Check the user's roles for a shorter cooldown
+    if (interaction.member && interaction.member.roles) {
+        for (const [roleId, roleCooldown] of Object.entries(roleCooldowns)) {
+            if (interaction.member.roles.cache.has(roleId)) {
+                cooldownSeconds = Math.min(cooldownSeconds, roleCooldown);
+            }
+        }
     }
 
 
