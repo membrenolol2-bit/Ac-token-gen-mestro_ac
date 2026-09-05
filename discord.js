@@ -246,7 +246,16 @@ client.on(Events.InteractionCreate, async interaction => {
     // Command handler: /generator
     if (interaction.isChatInputCommand() && interaction.commandName === 'generator') {
 
-    if (!ADMIN_ROLE_ID || !interaction.member || !interaction.member.roles.cache.has(ADMIN_ROLE_ID)) {
+    // Check if interaction is in a guild and member exists
+    if (!interaction.inGuild() || !interaction.member) {
+        return interaction.reply({
+            content: '❌ This command can only be used in the server.',
+            ephemeral: true
+        });
+    }
+
+    // Check if user has admin role
+    if (!interaction.member.roles.cache.has(ADMIN_ROLE_ID)) {
         return interaction.reply({
             content: '❌ You need the Admin role to use this command.',
             ephemeral: true
