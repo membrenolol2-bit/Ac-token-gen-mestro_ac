@@ -1,61 +1,31 @@
-const { 
-    Client, 
-    GatewayIntentBits, 
-    REST, 
-    Routes, 
-    SlashCommandBuilder, 
-    EmbedBuilder, 
-    ActionRowBuilder, 
-    ButtonBuilder, 
-    ButtonStyle,
-    Events
-} = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events } = require('discord.js');
 const express = require('express');
 const fs = require('fs');
 
-// Prevent unexpected process crashes
 process.on('unhandledRejection', (reason) => console.error('⚠️ [CRASH PREVENTED] Unhandled Rejection:', reason));
 process.on('uncaughtException', (err) => console.error('⚠️ [CRASH PREVENTED] Uncaught Exception:', err));
 
-// ==================== CONFIGURATION ====================
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const SERVER_ID = '1544326192868622458';
 const ADMIN_ROLE_ID = '1545078453651505225';
 const EXTRA_ROLE_ID = '1545557033376546857';
-const SERVER_KEY = process.env.SERVER_KEY || '5839ecdfd43bc7467f77cba4a40ea64c8ee5f986f61cf16a0e024ed2225891a4'; 
+const SERVER_KEY = process.env.SERVER_KEY || '5839ecdfd43bc7467f77cba4a40ea64c8ee5f986f61cf16a0e024ed2225891a4';
 const REFRESH_API_URL = 'https://animalcompany.us-east1.nakamacloud.io/v2/account/session/refresh';
 
-// Primary Master Refresh Token
 let MASTER_REFRESH_TOKEN = process.env.MASTER_REFRESH_TOKEN || "";
 
 function saveRefreshToken(newRefreshToken) {
-    if (!newRefreshToken || !newRefreshToken.trim()) {
-        return;
-    }
-
+    if (!newRefreshToken || !newRefreshToken.trim()) return;
     MASTER_REFRESH_TOKEN = newRefreshToken.trim();
-
     try {
         let dbData = {};
-
         if (fs.existsSync('./database.json')) {
             dbData = JSON.parse(fs.readFileSync('./database.json', 'utf8'));
         }
-
-        if (!Array.isArray(dbData.tokens)) {
-            dbData.tokens = [];
-        }
-
-        dbData.tokens[0] = {
-            refresh_token: MASTER_REFRESH_TOKEN
-        };
-
-        fs.writeFileSync(
-            './database.json',
-            JSON.stringify(dbData, null, 2)
-        );
-
+        if (!Array.isArray(dbData.tokens)) dbData.tokens = [];
+        dbData.tokens[0] = { refresh_token: MASTER_REFRESH_TOKEN };
+        fs.writeFileSync('./database.json', JSON.stringify(dbData, null, 2));
         console.log('✅ Saved newest refresh token.');
     } catch (error) {
         console.error('❌ Failed to save refresh token:', error.message);
@@ -63,25 +33,12 @@ function saveRefreshToken(newRefreshToken) {
 }
 
 const userCooldowns = new Map();
-
-let botSettings = {
-    logsChannelId: process.env.LOGS_CHANNEL_ID || "",
-    defaultCooldownSeconds: 600
-};
-
-const roleCooldowns = {
-    "1544790700690767902": 10,
-    "1544791353366679682": 210,
-    "1544791985204756511": 30
-};
+let botSettings = { logsChannelId: process.env.LOGS_CHANNEL_ID || "", defaultCooldownSeconds: 600 };
+const roleCooldowns = { "1544790700690767902": 10, "1544791353366679682": 210, "1544791985204756511": 30 };
 
 function getStoredTokens() {
     let tokenList = [];
-    
-    if (MASTER_REFRESH_TOKEN && MASTER_REFRESH_TOKEN.trim().length > 0) {
-        tokenList.push(MASTER_REFRESH_TOKEN.trim());
-    }
-
+    if (MASTER_REFRESH_TOKEN && MASTER_REFRESH_TOKEN.trim().length > 0) tokenList.push(MASTER_REFRESH_TOKEN.trim());
     if (fs.existsSync('./database.json')) {
         try {
             const dbRaw = fs.readFileSync('./database.json', 'utf8');
@@ -90,13 +47,9 @@ function getStoredTokens() {
                 dbData.tokens.forEach(item => {
                     try {
                         const parsed = typeof item === 'string' ? JSON.parse(item) : item;
-                        if (parsed.refresh_token) {
-                            tokenList.push(parsed.refresh_token.trim());
-                        }
+                        if (parsed.refresh_token) tokenList.push(parsed.refresh_token.trim());
                     } catch (e) {
-                        if (typeof item === 'string' && item.includes('eyJ')) {
-                            tokenList.push(item.trim());
-                        }
+                        if (typeof item === 'string' && item.includes('eyJ')) tokenList.push(item.trim());
                     }
                 });
             }
@@ -104,154 +57,90 @@ function getStoredTokens() {
             console.error('⚠️ Could not parse database.json tokens:', e.message);
         }
     }
-
     return [...new Set(tokenList)];
 }
 
-// ==================== DISCORD CLIENT SETUP ====================
-const client = new Client({ 
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMembers
-    ] 
-});
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMembers] });
 
-// --- LOGGING HELPER ---
 async function sendLog(embed) {
     if (!botSettings.logsChannelId) return;
     try {
         const channel = await client.channels.fetch(botSettings.logsChannelId);
-        if (channel && channel.isTextBased()) {
-            await channel.send({ embeds: [embed] });
-        }
+        if (channel && channel.isTextBased()) await channel.send({ embeds: [embed] });
     } catch (e) {
         console.error('❌ Failed to send log:', e.message);
     }
 }
 
-// --- LIVE TOKEN GENERATOR ---
 async function fetchLiveTokenPair() {
     console.log('⚡ Requesting live token exchange from Nulls API...');
-    
     const tokenCandidates = getStoredTokens();
     if (tokenCandidates.length === 0) {
         console.error('❌ No refresh tokens found in environment or database.json.');
         return null;
     }
-
     for (const activeToken of tokenCandidates) {
         try {
             const response = await fetch(REFRESH_API_URL, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
-                },
-                body: JSON.stringify({
-                    server_key: SERVER_KEY,
-                    refresh_token: activeToken
-                })
+                headers: { 'Content-Type': 'application/json', 'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5' },
+                body: JSON.stringify({ server_key: SERVER_KEY, refresh_token: activeToken })
             });
-
             if (!response.ok) {
                 const errBody = await response.text();
                 console.error(`❌ Nulls API Status ${response.status} | Details: ${errBody}`);
                 continue;
             }
-
             const data = await response.json();
-
             console.log('🔎 Nulls API response fields:', Object.keys(data));
-
             const freshBearer = data.token || data.bearer || data.access_token || data.jwt;
-
             if (freshBearer) {
                 const newRefreshToken = data.refresh_token || data.refreshToken || data.refresh || activeToken;
-
-                if (newRefreshToken !== activeToken) {
-                    saveRefreshToken(newRefreshToken);
-                }
-
-                return {
-                    bearer: freshBearer,
-                    refresh_token: newRefreshToken
-                };
+                if (newRefreshToken !== activeToken) saveRefreshToken(newRefreshToken);
+                return { bearer: freshBearer, refresh_token: newRefreshToken };
             }
-            
         } catch (error) {
             console.error('❌ Network error generating live token:', error.message);
         }
     }
-
     return null;
 }
 
-// --- SLASH COMMANDS REGISTRATION ---
-const commands = [
-    new SlashCommandBuilder().setName('generator').setDescription('Spawns the live token generator interface.')
-].map(c => c.toJSON());
+const commands = [new SlashCommandBuilder().setName('generator').setDescription('Spawns the live token generator interface.')].map(c => c.toJSON());
 
 if (TOKEN) {
     const rest = new REST({ version: '10' }).setToken(TOKEN);
-
-    rest.put(
-        Routes.applicationGuildCommands(CLIENT_ID, SERVER_ID),
-        { body: commands }
-    )
+    rest.put(Routes.applicationGuildCommands(CLIENT_ID, SERVER_ID), { body: commands })
         .then(() => console.log('✅ Server slash commands registered successfully.'))
         .catch(console.error);
 }
 
-// --- BOT EVENTS ---
-if (interaction.isChatInputCommand() && interaction.commandName === 'generator') {
- if (!interaction.inGuild() || !interaction.member) {
- return interaction.reply({
- content: '❌ This command can only be used in the server.',
- ephemeral: true
- });
- }
+client.once(Events.ClientReady, (readyClient) => {
+    console.log(`🚀 ONLINE: Logged in as ${readyClient.user.tag}`);
+});
 
- if (!interaction.member || !interaction.member.roles || !interaction.member.roles.cache.has(ADMIN_ROLE_ID)) {
- return interaction.reply({
- content: '❌ You need the Admin role to use this command.',
- ephemeral: true
- });
- }
+client.on(Events.InteractionCreate, async interaction => {
+    if (interaction.isChatInputCommand() && interaction.commandName === 'generator') {
+        if (!interaction.inGuild() || !interaction.member) {
+            return interaction.reply({ content: '❌ This command can only be used in the server.', ephemeral: true });
+        }
+        if (!interaction.member || !interaction.member.roles || !interaction.member.roles.cache.has(ADMIN_ROLE_ID)) {
+            return interaction.reply({ content: '❌ You need the Admin role to use this command.', ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+        const embed = new EmbedBuilder().setTitle('⚙️ 4\'s Token Generator').setDescription('Click the button below to generate a token!').setColor('#5865F2');
+        const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('claim_token').setLabel('Generate Live Token').setStyle(ButtonStyle.Success));
+        await interaction.editReply({ embeds: [embed], components: [row] });
+        return;
+    }
 
- // Defer immediately to avoid timeout
- await interaction.deferReply({ ephemeral: true });
-
- const embed = new EmbedBuilder()
- .setTitle('⚙️ 4\'s Token Generator')
- .setDescription('Click the button below to generate a token!')
- .setColor('#5865F2');
-
- const row = new ActionRowBuilder().addComponents(
- new ButtonBuilder()
- .setCustomId('claim_token')
- .setLabel('Generate Live Token')
- .setStyle(ButtonStyle.Success)
- );
-
- await interaction.editReply({ embeds: [embed], components: [row] });
- return;
-}
-
-    // Button handler: claim_token
     if (interaction.isButton() && interaction.customId === 'claim_token') {
         if (!interaction.inGuild() || !interaction.member) {
-            return interaction.reply({
-                content: '❌ This can only be used in the server.',
-                ephemeral: true
-            });
+            return interaction.reply({ content: '❌ This can only be used in the server.', ephemeral: true });
         }
-
         const userId = interaction.user.id;
         const now = Date.now();
-
         let cooldownSeconds = botSettings.defaultCooldownSeconds;
-
         if (interaction.member && interaction.member.roles) {
             for (const [roleId, roleCooldown] of Object.entries(roleCooldowns)) {
                 if (interaction.member.roles.cache.has(roleId)) {
@@ -259,86 +148,41 @@ if (interaction.isChatInputCommand() && interaction.commandName === 'generator')
                 }
             }
         }
-
         const lastUsed = userCooldowns.get(userId);
-
         if (lastUsed) {
             const elapsed = (now - lastUsed) / 1000;
             const remaining = cooldownSeconds - elapsed;
-
             if (remaining > 0) {
                 const minutes = Math.floor(remaining / 60);
                 const seconds = Math.ceil(remaining % 60);
-
-                return interaction.reply({
-                    content: `⏳ You are on cooldown. Please wait **${minutes}m ${seconds}s** before generating another token.`,
-                    ephemeral: true
-                });
+                return interaction.reply({ content: `⏳ You are on cooldown. Please wait **${minutes}m ${seconds}s** before generating another token.`, ephemeral: true });
             }
         }
-
         await interaction.deferReply({ flags: 64 });
-
         const tokenPair = await fetchLiveTokenPair();
-
         if (!tokenPair) {
-            return interaction.editReply({
-                content: '❌ Generation failed. Current Tokens have expired and will be restocked soon.'
-            });
+            return interaction.editReply({ content: '❌ Generation failed. Current Tokens have expired and will be restocked soon.' });
         }
-
-        const dmPayload = JSON.stringify({
-            _note: "thanks for using 4's token gen",
-            bearer: tokenPair.bearer,
-            refresh_token: tokenPair.refresh_token
-        }, null, 2);
-
+        const dmPayload = JSON.stringify({ _note: "thanks for using 4's token gen", bearer: tokenPair.bearer, refresh_token: tokenPair.refresh_token }, null, 2);
         try {
-            await interaction.user.send(
-                `**Your Token :**\n\`\`\`json\n${dmPayload}\n\`\`\``
-            );
-
+            await interaction.user.send(`**Your Token :**\n\`\`\`json\n${dmPayload}\n\`\`\``);
             userCooldowns.set(userId, Date.now());
-
             const cooldownMinutes = Math.ceil(cooldownSeconds / 60);
-
-            await interaction.editReply({
-                content: `📦 Check your Direct Messages for your token!\n⏳ Your next token will be available in **${cooldownMinutes} minute${cooldownMinutes === 1 ? '' : 's'}**.`
-            });
-
-            const logEmbed = new EmbedBuilder()
-                .setTitle('📜 Token Generated')
-                .addFields({
-                    name: 'User',
-                    value: `${interaction.user.tag} (\`${interaction.user.id}\`)`,
-                    inline: true
-                })
-                .setTimestamp()
-                .setColor('#57F287');
-
+            await interaction.editReply({ content: `📦 Check your Direct Messages for your token!\n⏳ Your next token will be available in **${cooldownMinutes} minute${cooldownMinutes === 1 ? '' : 's'}**.` });
+            const logEmbed = new EmbedBuilder().setTitle('📜 Token Generated').addFields({ name: 'User', value: `${interaction.user.tag} (\`${interaction.user.id}\`)`, inline: true }).setTimestamp().setColor('#57F287');
             await sendLog(logEmbed);
-
         } catch (e) {
-            await interaction.editReply({
-                content: '❌ Direct Messages are closed. Please open your DMs and try again.'
-            });
+            await interaction.editReply({ content: '❌ Direct Messages are closed. Please open your DMs and try again.' });
         }
     }
 });
 
-// ==================== WEB SERVER FOR RAILWAY ====================
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-app.get('/', (req, res) => {
-    res.send(`<h2>⚙️ Private Token Bot Online</h2>`);
-});
-
+app.get('/', (req, res) => res.send(`<h2>⚙️ Private Token Bot Online</h2>`));
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🌐 Web server active on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🌐 Web server active on port ${PORT}`));
 
 if (TOKEN) {
     client.login(TOKEN);
