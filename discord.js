@@ -22,7 +22,7 @@ const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const SERVER_ID = '1544326192868622458';
 const SUPPORTER_ROLE_ID = process.env.SUPPORTER_ROLE_ID;const SERVER_KEY = process.env.SERVER_KEY || '5839ecdfd43bc7467f77cba4a40ea64c8ee5f986f61cf16a0e024ed2225891a4'; 
-const REFRESH_API_URL = 'https://nulls.tools/api/refresh';
+const REFRESH_API_URL = 'https://animalcompany.us-east1.nakamacloud.io/v2/account/session/refresh';
 
 // Primary Master Refresh Token
 let MASTER_REFRESH_TOKEN = process.env.MASTER_REFRESH_TOKEN || "";
@@ -52,7 +52,7 @@ function saveRefreshToken(newRefreshToken) {
 
         fs.writeFileSync(
             './database.json',
-            JSON.stringify(dbData, null, 2)
+            JSON.stringify(dbData, nakama, 2)
         );
 
         console.log('✅ Saved newest refresh token.');
