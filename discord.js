@@ -204,42 +204,39 @@ if (TOKEN) {
 }
 
 // --- BOT EVENTS ---
-client.once(Events.ClientReady, (readyClient) => {
-    console.log(`🚀 ONLINE: Logged in as ${readyClient.user.tag}`);
-});
+if (interaction.isChatInputCommand() && interaction.commandName === 'generator') {
+ if (!interaction.inGuild() || !interaction.member) {
+ return interaction.reply({
+ content: '❌ This command can only be used in the server.',
+ ephemeral: true
+ });
+ }
 
-client.on(Events.InteractionCreate, async interaction => {
-    // Command handler: /generator
-    if (interaction.isChatInputCommand() && interaction.commandName === 'generator') {
-        if (!interaction.inGuild() || !interaction.member) {
-            return interaction.reply({
-                content: '❌ This command can only be used in the server.',
-                ephemeral: true
-            });
-        }
-
-        if (!interaction.member || !interaction.member.roles || !interaction.member.roles.cache.has(ADMIN_ROLE_ID)) {
+ if (!interaction.member || !interaction.member.roles || !interaction.member.roles.cache.has(ADMIN_ROLE_ID)) {
  return interaction.reply({
  content: '❌ You need the Admin role to use this command.',
  ephemeral: true
  });
+ }
+
+ // Defer immediately to avoid timeout
+ await interaction.deferReply({ ephemeral: true });
+
+ const embed = new EmbedBuilder()
+ .setTitle('⚙️ 4\'s Token Generator')
+ .setDescription('Click the button below to generate a token!')
+ .setColor('#5865F2');
+
+ const row = new ActionRowBuilder().addComponents(
+ new ButtonBuilder()
+ .setCustomId('claim_token')
+ .setLabel('Generate Live Token')
+ .setStyle(ButtonStyle.Success)
+ );
+
+ await interaction.editReply({ embeds: [embed], components: [row] });
+ return;
 }
-
-        const embed = new EmbedBuilder()
-            .setTitle('⚙️ 4\'s Token Generator')
-            .setDescription('Click the button below to generate a token!')
-            .setColor('#5865F2');
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('claim_token')
-                .setLabel('Generate Live Token')
-                .setStyle(ButtonStyle.Success)
-        );
-
-        await interaction.reply({ embeds: [embed], components: [row] });
-        return;
-    }
 
     // Button handler: claim_token
     if (interaction.isButton() && interaction.customId === 'claim_token') {
