@@ -244,12 +244,12 @@ client.on(Events.InteractionCreate, async interaction => {
     // Command handler: /generator
     if (interaction.isChatInputCommand() && interaction.commandName === 'generator') {
 
-    if (!interaction.member.roles.cache.has(SUPPORTER_ROLE_ID)) {
-        return interaction.reply({
-            content: '❌ You need the Supporter role to use this command.',
-            ephemeral: true
-        });
-    }
+    if (!SUPPORTER_ROLE_ID || !interaction.member.roles.cache.has(SUPPORTER_ROLE_ID)) {
+    return interaction.reply({
+        content: '❌ You need the Supporter role to use this command.',
+        ephemeral: true
+    });
+}
 
 
         const embed = new EmbedBuilder()
